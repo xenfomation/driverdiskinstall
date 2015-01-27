@@ -1,0 +1,95 @@
+#!/bin/bash
+
+##[ ABOUT ]####################################################################
+# 
+# driverdiscinstall
+# A simple bash script to help install ISO images for XenServer
+# 2014, JK Benedict | @xenfomation\
+#
+# THIS FILE IS PROVIDED-AS IS AND IS NOT SUPPORTED BY CITRIX OR ITS AFFILIATES
+#
+# THIS FILE SHOULD BE MOVED TO /usr/bin or /usr/sbin AND made executable!
+#
+# This file will allow you to:
+#	- mount a specified driver disk ISO image provided by XenServer
+#	- Run the driver installer
+# - And exit!
+#
+# TO BE DONE/REMOVED:
+# - To keep this interactive, I removed a question to "remove ISO file?"
+# - Will integrate with wget for pulling this content (later)
+# - To add driver/kernel module information befor and after
+#
+###############################################################################
+
+
+# Check for ISO in argument
+if [ -z $1 ]; then
+	echo ""
+	echo "ERROR: An ISO file must be specified as an argument/option!"
+	echo "example:"
+	echo "	xe-iso-tool emulex.iso"
+	echo "	xe-iso-tool /root/emulex.iso"
+	echo ""
+	exit
+fi
+
+# Check that the ISO is legit
+if  [ ! -f $1 ]; then
+	echo ""
+	echo "ERROR: I cannot find supplied ISO image!"
+	echo "ISO image '$1' cannot be found"
+	echo ""
+	exit
+fi
+
+# Check disk space
+diskSpace=`df -h | head -n 2 | grep "/$" | awk {' print $5 '} | sed "s/%//"`
+if [[ "$diskSpace" > "90" ]]; then
+	echo ""
+	echo "CAUTION: The root file system is at $diskSpace% capacity!"
+	echo "	Before installing anything else, please clean-up old log files, etc"
+	echo "	to ensure the root disk has plenty of space to perform the install!"
+	echo ""
+	exit
+fi
+
+# Get current path
+thisDIR=`pwd`
+echo "-- Current path is $thisDIR"
+
+# Check if /tmp/isoMP already exists
+if [ -f "/tmp/isoMP" ]; then
+	echo ""
+	echo "WARNING: /tmp/isoMP already exists?"
+	echo "It is possible the installer is already running or was not exited"
+	echo "properly exited."
+	echo ""
+	echo "Please check:"
+	echo "	- mount (this will show if /tmp/isoMP has anything mounted)"
+	echo "	- ls /tmp/isoMP (to see if any contents exist)"
+	echo "	- umount /tmp/isoMP (to unmount anything)"
+	echo "	- If other users may be running this script"
+	echo ""
+	exit
+fi
+
+# Let's do some magic
+echo "-- Creating /tmp/isoMP/"
+mkdir /tmp/isoMP
+echo "-- Mounting $1"
+mount -o loop "$1" /tmp/isoMP
+echo "-- Running default installer"
+cd /tmp/isoMP
+./install
+cd "$thisDIR"
+echo "-- Unmounting $1"
+umount /tmp/isoMP
+echo "-- Removing /tmp/isoMP"
+rmdir /tmp/isoMP
+echo "-- Moving back to $thisDIR"
+cd "$thisDIR"
+echo ""
+echo "DO NOT delete '$1' until you reboot and validate the drivers work!"
+echo ""
+
